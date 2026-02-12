@@ -5,7 +5,6 @@ import {
     DisconnectReason
 } from "@whiskeysockets/baileys"
 
-import fs from "fs"
 import autoReply from "./lib/autoReply.js"
 import P from "pino"
 import readline from "readline"
@@ -98,7 +97,18 @@ async function startBot(){
         }catch(e){
             console.log("Pairing error:", e.message)
             isStarting = false
-            return startBot()
+
+            const shouldRetry = e?.message !== "readline was closed"
+
+            if(shouldRetry){
+                setTimeout(() => {
+                    startBot()
+                }, 3000)
+            }else{
+                console.log("⏹️ Pairing dihentikan karena input terminal tidak tersedia.")
+            }
+
+            return
         }
     }
 
