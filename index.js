@@ -44,6 +44,8 @@ const question = (text) => new Promise(resolve => rl.question(text, resolve))
 let isStarting = false
 let currentSock = null
 let isPairing = false
+let pairingRetryCount = 0
+const MAX_PAIRING_RETRIES = 5
 
 export const BOT_STATUS = {
     startTime: Date.now(),
@@ -83,16 +85,23 @@ async function startBot(){
 
             isPairing = true
 
-            let phoneNumber = await question(`Masukkan nomor WhatsApp (Enter = ${DEFAULT_NUMBER}) : `)
+            let phoneNumber = DEFAULT_NUMBER
 
-            if(!phoneNumber || phoneNumber.trim() === ""){
-                phoneNumber = DEFAULT_NUMBER
-                console.log("Menggunakan nomor default:", phoneNumber)
+            if(process.stdin.isTTY){
+                const answer = await question(`Masukkan nomor WhatsApp (Enter = ${DEFAULT_NUMBER}) : `)
+                if(answer && answer.trim() !== ""){
+                    phoneNumber = answer.trim()
+                }
+            }else{
+                console.log("Terminal non-interaktif terdeteksi, menggunakan nomor default.")
             }
+
+            console.log("Menggunakan nomor:", phoneNumber)
 
             const code = await sock.requestPairingCode(phoneNumber)
 
             logMessage("PAIRING CODE", code, colors.yellow)
+            pairingRetryCount = 0
 
         }catch(e){
             console.log("Pairing error:", e.message)
@@ -100,13 +109,24 @@ async function startBot(){
 
             const shouldRetry = e?.message !== "readline was closed"
 
-            if(shouldRetry){
-                setTimeout(() => {
-                    startBot()
-                }, 3000)
-            }else{
+            if(!shouldRetry){
                 console.log("⏹️ Pairing dihentikan karena input terminal tidak tersedia.")
+                return
             }
+
+            pairingRetryCount += 1
+
+            if(pairingRetryCount > MAX_PAIRING_RETRIES){
+                console.log(`⏹️ Pairing dihentikan setelah ${MAX_PAIRING_RETRIES} kali percobaan gagal.`)
+                return
+            }
+
+            const retryDelay = Math.min(3000 * pairingRetryCount, 15000)
+            console.log(`🔁 Coba pairing ulang dalam ${retryDelay / 1000} detik... (${pairingRetryCount}/${MAX_PAIRING_RETRIES})`)
+
+            setTimeout(() => {
+                startBot()
+            }, retryDelay)
 
             return
         }
@@ -122,6 +142,7 @@ async function startBot(){
             BOT_STATUS.connected = true
             isStarting = false
             isPairing = false
+            pairingRetryCount = 0
 
             console.log("✅ Connected")
         }
@@ -172,7 +193,10 @@ async function startBot(){
             return
         }
 
-        await autoReply(sock, chatId, text, { id: chatId })
+        await autoReply(sock, chatId, text, {
+            id: chatId,
+            botStatus: BOT_STATUS
+        })
     })
 
     logMessage("BOT READY","🤖 Bot aktif",colors.blue)
