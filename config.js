@@ -1,0 +1,3 @@
+export const CONFIG = {
+   DEFAULT_NUMBER: "6285832852878"
+}
