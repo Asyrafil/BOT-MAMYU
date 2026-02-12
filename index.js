@@ -177,6 +177,9 @@ async function startBot(){
         const text =
             m.message.conversation ||
             m.message.extendedTextMessage?.text ||
+            m.message.buttonsResponseMessage?.selectedButtonId ||
+            m.message.templateButtonReplyMessage?.selectedId ||
+            m.message.listResponseMessage?.singleSelectReply?.selectedRowId ||
             ""
 
         const chatId = m.key.remoteJid
